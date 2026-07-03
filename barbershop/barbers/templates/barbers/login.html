@@ -1,0 +1,57 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Вход для персонала — BarberBook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'barbers/css/theme.css' %}">
+<style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+    .login-card { width: 100%; max-width: 360px; overflow: hidden; animation: riseIn 0.35s ease; }
+    .login-card-inner { padding: 30px 28px 32px; }
+    .login-brand { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 22px; }
+    .login-brand .mark { width: 14px; height: 14px; background: var(--yellow); transform: rotate(45deg); margin-bottom: 14px; }
+    .login-brand h1 { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 0.05em; margin: 0; }
+    .login-brand p { color: var(--gray); font-size: 0.85rem; margin: 6px 0 0; }
+    .error-msg {
+        color: var(--yellow); background: var(--yellow-soft); border: 1px solid var(--yellow-dim);
+        border-radius: var(--radius-sm); padding: 10px 14px; font-size: 0.85rem; text-align: center; margin-bottom: 18px;
+    }
+    .submit-btn { width: 100%; margin-top: 22px; }
+</style>
+</head>
+<body>
+
+<div class="surface login-card">
+    <div class="stripe-edge"></div>
+    <div class="login-card-inner">
+        <div class="login-brand">
+            <span class="mark"></span>
+            <h1>BARBER<span style="color:var(--yellow);">BOOK</span></h1>
+            <p>Вход в кабинет персонала</p>
+        </div>
+
+        {% if form.errors %}
+            <div class="error-msg">Неверный логин или пароль</div>
+        {% endif %}
+
+        <form method="POST" action="{% url 'master_login' %}?next=/master/">
+            {% csrf_token %}
+            <div class="field">
+                <label for="id_username">Логин</label>
+                <input type="text" id="id_username" name="username" required placeholder="master_alex" autofocus>
+            </div>
+            <div class="field">
+                <label for="id_password">Пароль</label>
+                <input type="password" id="id_password" name="password" required placeholder="••••••••">
+            </div>
+            <button type="submit" class="btn btn-primary submit-btn">Войти в кабинет</button>
+        </form>
+    </div>
+</div>
+
+</body>
+</html>

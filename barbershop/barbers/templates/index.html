@@ -1,0 +1,509 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BarberBook — Онлайн-запись</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'barbers/css/theme.css' %}">
+<style>
+    .page { max-width: 540px; margin: 0 auto; padding: 0 18px 60px; }
+
+    .lede { color: var(--gray); font-size: 0.95rem; margin: 4px 0 22px; }
+
+    /* progress */
+    .progress {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        margin-bottom: 22px;
+    }
+    .progress .seg { height: 5px; border-radius: 999px; background: var(--line); overflow: hidden; }
+    .progress .seg.done { background: var(--stripe); background-size: 200% 200%; }
+    .progress .seg.current { background: var(--yellow-dim); }
+    .progress-labels {
+        display: flex; justify-content: space-between;
+        font-size: 0.72rem; color: var(--gray-dim); text-transform: uppercase; letter-spacing: 0.04em;
+        margin-bottom: 28px;
+    }
+    .progress-labels span.active { color: var(--yellow); }
+
+    .booking-card {
+        background: var(--charcoal);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+    .booking-card-inner { padding: 26px 24px 28px; }
+
+    .step { display: none; animation: riseIn 0.32s ease; }
+    .step.active { display: block; }
+
+    .step-eyebrow { font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray); margin: 0 0 4px; }
+    .step h2 { font-family: 'Bebas Neue', sans-serif; font-size: 1.9rem; letter-spacing: 0.02em; margin: 0 0 18px; }
+
+    .grid-list { display: grid; gap: 12px; }
+
+    .pick-card {
+        display: flex; align-items: center; justify-content: space-between; gap: 14px;
+        background: var(--charcoal-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+        cursor: pointer;
+        transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .pick-card:hover { border-color: var(--yellow-dim); }
+    .pick-card .name { font-weight: 700; font-size: 1.02rem; }
+    .pick-card .meta { color: var(--gray); font-size: 0.85rem; margin-top: 3px; }
+    .pick-card .price { font-family: 'JetBrains Mono', monospace; color: var(--yellow); font-weight: 500; white-space: nowrap; }
+    .pick-card .arrow { color: var(--gray-dim); flex-shrink: 0; transition: transform 0.15s ease; }
+    .pick-card:hover .arrow { transform: translateX(3px); color: var(--yellow); }
+
+    .avatar-chip {
+        width: 42px; height: 42px; border-radius: 50%;
+        background: var(--yellow-soft); color: var(--yellow);
+        display: flex; align-items: center; justify-content: center;
+        font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+
+    .empty-note {
+        color: var(--gray);
+        font-size: 0.9rem;
+        background: var(--charcoal-2);
+        border: 1px dashed var(--line);
+        border-radius: var(--radius-sm);
+        padding: 16px;
+        text-align: center;
+    }
+
+    .mini-cal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .mini-cal-head h3 { font-family: 'Bebas Neue', sans-serif; font-size: 1.15rem; letter-spacing: 0.03em; margin: 0; }
+    .btn-sm { padding: 8px 13px; font-size: 0.85rem; }
+    .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
+    .mini-cal-grid .wd { font-size: 0.65rem; font-weight: 700; color: var(--gray-dim); text-transform: uppercase; padding-bottom: 3px; }
+    .mini-cal-grid .day {
+        padding: 10px 0; border-radius: var(--radius-sm); font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+        background: var(--charcoal-2); border: 1px solid transparent; transition: all 0.12s ease;
+    }
+    .mini-cal-grid .day.empty { background: transparent; }
+    .mini-cal-grid .day.status-off { color: var(--gray-dim); text-decoration: line-through; opacity: 0.55; cursor: not-allowed; }
+    .mini-cal-grid .day.status-past { color: var(--gray-dim); opacity: 0.3; cursor: not-allowed; }
+    .mini-cal-grid .day.status-full { color: var(--gray-dim); opacity: 0.8; cursor: not-allowed; }
+    .mini-cal-grid .day.status-available { color: var(--white); cursor: pointer; }
+    .mini-cal-grid .day.status-available:hover { border-color: var(--yellow-dim); }
+    .mini-cal-grid .day.selected { background: var(--yellow) !important; color: var(--black) !important; font-weight: 700; border-color: var(--yellow) !important; }
+    .mini-cal-legend { display: flex; gap: 16px; margin-top: 14px; font-size: 0.76rem; color: var(--gray); flex-wrap: wrap; }
+    .mini-cal-legend .dot { width: 9px; height: 9px; border-radius: 3px; display: inline-block; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--line); }
+    .dot.avail-dot { background: var(--charcoal-2); border-color: var(--yellow-dim); }
+    .dot.full-dot { background: var(--charcoal-2); opacity: 0.8; }
+    .dot.off-dot2 { background: var(--charcoal-2); }
+
+    .time-slots { display: flex; flex-wrap: wrap; gap: 9px; }
+    .slot {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.92rem;
+        background: var(--charcoal-2);
+        border: 1px solid var(--line);
+        color: var(--white);
+        padding: 11px 14px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: all 0.12s ease;
+    }
+    .slot:hover { border-color: var(--yellow-dim); }
+    .slot.selected { background: var(--yellow); color: var(--black); border-color: var(--yellow); font-weight: 700; }
+
+    .recap {
+        background: var(--charcoal-2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        padding: 14px 16px;
+        margin-bottom: 20px;
+        font-size: 0.9rem;
+    }
+    .recap-row { display: flex; justify-content: space-between; padding: 5px 0; color: var(--gray); }
+    .recap-row b { color: var(--white); font-weight: 600; }
+    .recap-row .v { font-family: 'JetBrains Mono', monospace; color: var(--white); }
+
+    .back-link {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: 0.85rem; color: var(--gray); cursor: pointer; margin-bottom: 16px; user-select: none;
+    }
+    .back-link:hover { color: var(--yellow); }
+
+    .submit-btn { width: 100%; }
+    .skeleton { color: var(--gray-dim); font-size: 0.9rem; padding: 6px 2px; }
+
+    .success-screen { text-align: center; padding: 10px 0 4px; animation: riseIn 0.35s ease; }
+    .success-screen .check {
+        width: 56px; height: 56px; margin: 0 auto 18px;
+        border-radius: 50%; background: var(--yellow-soft);
+        display: flex; align-items: center; justify-content: center;
+    }
+    .success-screen h2 { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; margin: 0 0 8px; }
+    .success-screen p { color: var(--gray); font-size: 0.92rem; line-height: 1.5; }
+
+    .auth-links {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 30px;
+    }
+</style>
+</head>
+<body>
+
+<div class="page">
+    <div class="brand-bar">
+        <span class="mark"></span>
+        <span class="name">BARBER<b>BOOK</b></span>
+    </div>
+    <p class="lede">Запишитесь к своему мастеру за четыре коротких шага.</p>
+
+    <div class="progress">
+        <div class="seg" id="seg-1"></div>
+        <div class="seg" id="seg-2"></div>
+        <div class="seg" id="seg-3"></div>
+        <div class="seg" id="seg-4"></div>
+    </div>
+    <div class="progress-labels">
+        <span id="lab-1">Услуга</span>
+        <span id="lab-2">Мастер</span>
+        <span id="lab-3">Время</span>
+        <span id="lab-4">Контакты</span>
+    </div>
+
+    <div class="booking-card">
+        <div class="stripe-edge"></div>
+        <div class="booking-card-inner">
+
+            <!-- ШАГ 1: УСЛУГА -->
+            <div id="step-1" class="step active">
+                <p class="step-eyebrow">Шаг 1 из 4</p>
+                <h2>Выберите услугу</h2>
+                <div id="services-list" class="grid-list">
+                    <div class="skeleton">Загружаем услуги…</div>
+                </div>
+            </div>
+
+            <!-- ШАГ 2: МАСТЕР -->
+            <div id="step-2" class="step">
+                <span class="back-link" onclick="goToStep(1)">← Назад к услугам</span>
+                <p class="step-eyebrow">Шаг 2 из 4</p>
+                <h2>Выберите мастера</h2>
+                <div id="masters-list" class="grid-list">
+                    <div class="skeleton">Загружаем мастеров…</div>
+                </div>
+            </div>
+
+            <!-- ШАГ 3: ДАТА И ВРЕМЯ -->
+            <div id="step-3" class="step">
+                <span class="back-link" onclick="goToStep(2)">← Назад к мастеру</span>
+                <p class="step-eyebrow">Шаг 3 из 4</p>
+                <h2>Дата и время</h2>
+
+                <div class="mini-cal-head">
+                    <button class="btn btn-outline btn-sm" onclick="changeClientMonth(-1)">←</button>
+                    <h3 id="client-cal-title">Месяц Год</h3>
+                    <button class="btn btn-outline btn-sm" onclick="changeClientMonth(1)">→</button>
+                </div>
+                <div class="mini-cal-grid" id="client-cal-grid"></div>
+                <div class="mini-cal-legend">
+                    <span><span class="dot avail-dot"></span>Свободно</span>
+                    <span><span class="dot full-dot"></span>Занято</span>
+                    <span><span class="dot off-dot2"></span>Выходной</span>
+                </div>
+
+                <div id="slots-container" class="time-slots" style="margin-top:20px;">
+                    <p class="empty-note">Выберите дату в календаре, чтобы увидеть свободное время</p>
+                </div>
+            </div>
+
+            <!-- ШАГ 4: КОНТАКТЫ -->
+            <div id="step-4" class="step">
+                <span class="back-link" onclick="goToStep(3)">← Назад ко времени</span>
+                <p class="step-eyebrow">Шаг 4 из 4</p>
+                <h2>Подтвердите запись</h2>
+
+                <div class="recap" id="recap-box"></div>
+
+                <div class="field">
+                    <label for="client-name">Ваше имя</label>
+                    <input type="text" id="client-name" placeholder="Иван">
+                </div>
+                <div class="field">
+                    <label for="client-phone">Номер телефона</label>
+                    <input type="text" id="client-phone" placeholder="+7 (707) 111-22-33">
+                </div>
+                <button class="btn btn-primary submit-btn" style="margin-top:22px;" onclick="submitBooking()" id="submit-btn">Записаться</button>
+            </div>
+
+            <!-- ЭКРАН УСПЕХА -->
+            <div id="step-success" class="step success-screen">
+                <div class="check">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 12.5L9.5 18L20 6" stroke="#f4c10f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h2>Вы записаны</h2>
+                <p>Мастер получит уведомление о вашей записи.<br>Ждём вас в назначенное время.</p>
+                <button class="btn btn-outline" style="margin-top:20px;" onclick="location.reload()">Записаться ещё раз</button>
+            </div>
+
+        </div>
+    </div>
+    <div class="auth-links">
+            <a href="/master/login/" class="btn btn-outline">
+                Вход для мастера
+            </a>
+
+            <a href="/admin/" class="btn btn-outline">
+                Админка
+            </a>
+        </div>
+</div>
+
+<script>
+    let bookingData = { service_id: null, service_name: '', service_price: null, master_id: null, master_name: '', date: null, time_slot: null, name: '', phone: '' };
+    let currentStep = 1;
+
+    function goToStep(n) {
+        document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+        document.getElementById(`step-${n}`).classList.add('active');
+        currentStep = n;
+        for (let i = 1; i <= 4; i++) {
+            const seg = document.getElementById(`seg-${i}`);
+            const lab = document.getElementById(`lab-${i}`);
+            seg.classList.remove('done', 'current');
+            lab.classList.remove('active');
+            if (i < n) seg.classList.add('done');
+            else if (i === n) { seg.classList.add('current'); lab.classList.add('active'); }
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        fetch('/api/services/')
+            .then(res => res.json())
+            .then(data => {
+                const container = document.getElementById('services-list');
+                container.innerHTML = '';
+                if (!data.services || data.services.length === 0) {
+                    container.innerHTML = '<p class="empty-note">Пока нет доступных услуг. Загляните позже.</p>';
+                    return;
+                }
+                data.services.forEach(service => {
+                    const card = document.createElement('div');
+                    card.className = 'pick-card';
+                    card.innerHTML = `
+                        <div>
+                            <div class="name">${service.name}</div>
+                            <div class="meta">${service.duration_minutes} мин</div>
+                        </div>
+                        <div class="price">${Math.round(service.price)} ₸</div>`;
+                    card.onclick = () => {
+                        bookingData.service_id = service.id;
+                        bookingData.service_name = service.name;
+                        bookingData.service_price = service.price;
+                        loadMasters();
+                    };
+                    container.appendChild(card);
+                });
+            })
+            .catch(() => {
+                document.getElementById('services-list').innerHTML = '<p class="empty-note">Не удалось загрузить услуги. Обновите страницу.</p>';
+            });
+    });
+
+    function loadMasters() {
+        const container = document.getElementById('masters-list');
+        container.innerHTML = '<div class="skeleton">Загружаем мастеров…</div>';
+        goToStep(2);
+        console.log(bookingData.service_id);
+        fetch(`/api/masters/?service_id=${bookingData.service_id}`)
+            .then(res => res.json())
+            .then(data => {
+                container.innerHTML = '';
+                if (!data.masters || data.masters.length === 0) {
+                    container.innerHTML = '<p class="empty-note">Свободных мастеров нет.</p>';
+                    return;
+                }
+                data.masters.forEach(master => {
+                    const initial = (master.name || '?').trim().charAt(0).toUpperCase();
+                    const card = document.createElement('div');
+                    card.className = 'pick-card';
+                    card.innerHTML = `
+                        <div style="display:flex; align-items:center; gap:14px;">
+                            <div class="avatar-chip">${initial}</div>
+                            <div>
+                                <div class="name">${master.name}</div>
+                                <div class="meta">${master.bio || 'Барбер BarberBook'}</div>
+                            </div>
+                        </div>
+                        <div class="arrow">→</div>`;
+                    card.onclick = () => {
+                        bookingData.master_id = master.master_id;
+                        bookingData.master_name = master.name;
+                        initCalendar();
+                    };
+                    container.appendChild(card);
+                });
+            })
+            .catch(() => {
+                container.innerHTML = '<p class="empty-note">Не удалось загрузить мастеров. Попробуйте ещё раз.</p>';
+            });
+    }
+
+    let clientCalYear, clientCalMonth;
+    const CLIENT_MONTH_NAMES = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+    const CLIENT_DAY_NAMES = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+    function initCalendar() {
+        goToStep(3);
+        const today = new Date();
+        clientCalYear = today.getFullYear();
+        clientCalMonth = today.getMonth();
+        bookingData.date = null;
+        bookingData.time_slot = null;
+        document.getElementById('slots-container').innerHTML = '<p class="empty-note">Выберите дату в календаре, чтобы увидеть свободное время</p>';
+        loadClientMonth();
+    }
+
+    function changeClientMonth(direction) {
+        clientCalMonth += direction;
+        if (clientCalMonth > 11) { clientCalMonth = 0; clientCalYear++; }
+        else if (clientCalMonth < 0) { clientCalMonth = 11; clientCalYear--; }
+        loadClientMonth();
+    }
+
+    function loadClientMonth() {
+        const grid = document.getElementById('client-cal-grid');
+        document.getElementById('client-cal-title').innerText = `${CLIENT_MONTH_NAMES[clientCalMonth]} ${clientCalYear}`;
+        grid.innerHTML = '<p class="empty-note" style="grid-column:1/-1;">Загружаем календарь…</p>';
+
+        fetch(`/api/masters/${bookingData.master_id}/month-availability/?year=${clientCalYear}&month=${clientCalMonth + 1}`)
+            .then(res => res.json())
+            .then(data => renderClientCalendar(data.days || {}))
+            .catch(() => {
+                grid.innerHTML = '<p class="empty-note" style="grid-column:1/-1;">Не удалось загрузить календарь</p>';
+            });
+    }
+
+    function renderClientCalendar(daysStatus) {
+        const grid = document.getElementById('client-cal-grid');
+        grid.innerHTML = '';
+
+        CLIENT_DAY_NAMES.forEach(d => {
+            const el = document.createElement('div');
+            el.className = 'wd';
+            el.innerText = d;
+            grid.appendChild(el);
+        });
+
+        const firstDayIndex = new Date(clientCalYear, clientCalMonth, 1).getDay();
+        const startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+        const totalDays = new Date(clientCalYear, clientCalMonth + 1, 0).getDate();
+
+        for (let i = 0; i < startOffset; i++) {
+            const e = document.createElement('div');
+            e.className = 'day empty';
+            grid.appendChild(e);
+        }
+
+        for (let day = 1; day <= totalDays; day++) {
+            const dateStr = `${clientCalYear}-${String(clientCalMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const status = daysStatus[dateStr] || 'off';
+            const cell = document.createElement('div');
+            cell.className = `day status-${status}`;
+            cell.innerText = day;
+            if (bookingData.date === dateStr) cell.classList.add('selected');
+
+            if (status === 'available') {
+                cell.onclick = () => selectClientDate(dateStr, cell);
+            }
+            grid.appendChild(cell);
+        }
+    }
+
+    function selectClientDate(dateStr, cellEl) {
+        document.querySelectorAll('#client-cal-grid .day.selected').forEach(el => el.classList.remove('selected'));
+        cellEl.classList.add('selected');
+        bookingData.date = dateStr;
+        bookingData.time_slot = null;
+
+        const container = document.getElementById('slots-container');
+        container.innerHTML = '<div class="skeleton">Ищем свободное время…</div>';
+
+        fetch(`/api/masters/${bookingData.master_id}/slots/?date=${dateStr}`)
+            .then(res => res.json())
+            .then(data => {
+                container.innerHTML = '';
+                const slots = data.available_slots || [];
+                if (slots.length === 0) {
+                    container.innerHTML = `<p class="empty-note">${data.message || 'Нет свободных мест на эту дату'}</p>`;
+                    return;
+                }
+                slots.forEach(slot => {
+                    const slotBtn = document.createElement('div');
+                    slotBtn.className = 'slot';
+                    slotBtn.innerText = slot;
+                    slotBtn.onclick = () => {
+                        bookingData.time_slot = slot;
+                        renderRecap();
+                        goToStep(4);
+                    };
+                    container.appendChild(slotBtn);
+                });
+            })
+            .catch(() => {
+                container.innerHTML = '<p class="empty-note">Не удалось загрузить расписание. Попробуйте ещё раз.</p>';
+            });
+    }
+
+    function renderRecap() {
+        const [y, m, d] = bookingData.date.split('-');
+        document.getElementById('recap-box').innerHTML = `
+            <div class="recap-row"><span>Услуга</span><b>${bookingData.service_name}</b></div>
+            <div class="recap-row"><span>Мастер</span><b>${bookingData.master_name}</b></div>
+            <div class="recap-row"><span>Когда</span><span class="v">${d}.${m}.${y} в ${bookingData.time_slot}</span></div>`;
+    }
+
+    function submitBooking() {
+        bookingData.name = document.getElementById('client-name').value.trim();
+        bookingData.phone = document.getElementById('client-phone').value.trim();
+
+        if (!bookingData.name || !bookingData.phone) {
+            alert('Укажите имя и номер телефона.');
+            return;
+        }
+
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        btn.innerText = 'Записываем…';
+
+        fetch('/api/appointments/create/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bookingData)
+        })
+        .then(res => res.json().then(data => ({ ok: res.ok, data })))
+        .then(({ ok, data }) => {
+            if (ok && data.status === 'success') {
+                goToStep('success');
+            } else {
+                alert('Ошибка: ' + (data.error || 'попробуйте ещё раз'));
+                btn.disabled = false;
+                btn.innerText = 'Записаться';
+            }
+        })
+        .catch(() => {
+            alert('Не удалось связаться с сервером. Проверьте подключение и попробуйте ещё раз.');
+            btn.disabled = false;
+            btn.innerText = 'Записаться';
+        });
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+/* ==========================================================================
+   BARBERBOOK — design tokens & shared components
+   Чёрно-жёлто-белая палитра, плакатная типографика барбершопа.
+   ========================================================================== */
+
+:root {
+    --black:        #0b0b0c;
+    --charcoal:      #17181a;
+    --charcoal-2:    #1f2023;
+    --line:          #2b2c2f;
+    --yellow:        #f4c10f;
+    --yellow-dim:    #caa00c;
+    --yellow-soft:   rgba(244, 193, 15, 0.12);
+    --white:         #f7f5f0;
+    --gray:          #8d8d8a;
+    --gray-dim:      #5e5e5b;
+    --ok:            #6fae6a;
+
+    --radius:        10px;
+    --radius-sm:     6px;
+    --stripe: repeating-linear-gradient(
+        135deg,
+        var(--yellow) 0px, var(--yellow) 10px,
+        var(--black) 10px, var(--black) 20px
+    );
+}
+
+* { box-sizing: border-box; }
+
+html { min-height: 100%; background: var(--black); }
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--black);
+    background-image:
+        radial-gradient(ellipse 900px 500px at 50% -10%, rgba(244,193,15,0.07), transparent 60%);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    color: var(--white);
+    font-family: 'Manrope', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+    font-family: 'Bebas Neue', 'Manrope', sans-serif;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.font-mono {
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+::selection { background: var(--yellow); color: var(--black); }
+
+a { color: inherit; }
+
+/* ---------- brand bar ---------- */
+.brand-bar {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 22px 0 6px;
+}
+.brand-bar .mark {
+    width: 10px; height: 10px;
+    background: var(--yellow);
+    transform: rotate(45deg);
+    flex-shrink: 0;
+}
+.brand-bar .name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    letter-spacing: 0.08em;
+}
+.brand-bar .name b { color: var(--yellow); }
+
+/* ---------- stripe accent (signature element) ---------- */
+.stripe-edge {
+    height: 5px;
+    background: var(--stripe);
+    border-radius: 999px 999px 0 0;
+}
+
+/* ---------- buttons ---------- */
+.btn {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    border: 1px solid var(--line);
+    background: var(--charcoal-2);
+    color: var(--white);
+    padding: 13px 20px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.btn:hover { border-color: var(--gray-dim); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+
+.btn-primary {
+    background: var(--yellow);
+    color: var(--black);
+    border-color: var(--yellow);
+}
+.btn-primary:hover { background: var(--yellow-dim); border-color: var(--yellow-dim); }
+.btn-primary:disabled {
+    background: var(--charcoal-2);
+    color: var(--gray-dim);
+    border-color: var(--line);
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-outline {
+    background: transparent;
+    border-color: var(--line);
+    color: var(--gray);
+}
+.btn-outline:hover { border-color: var(--yellow); color: var(--yellow); }
+
+.btn-ghost {
+    background: transparent;
+    border: none;
+    color: var(--gray);
+}
+.btn-ghost:hover { color: var(--white); }
+
+/* ---------- inputs ---------- */
+.field { display: flex; flex-direction: column; gap: 7px; margin-top: 16px; }
+.field label {
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--gray);
+    font-weight: 700;
+}
+.field input {
+    font-family: 'Manrope', sans-serif;
+    font-size: 1rem;
+    padding: 13px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--charcoal);
+    color: var(--white);
+}
+.field input::placeholder { color: var(--gray-dim); }
+.field input:focus {
+    outline: none;
+    border-color: var(--yellow);
+    box-shadow: 0 0 0 3px var(--yellow-soft);
+}
+
+/* ---------- card ---------- */
+.surface {
+    background: var(--charcoal);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+/* ---------- badges / status ---------- */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--gray);
+}
+.badge.is-pending { color: var(--yellow); border-color: var(--yellow-dim); background: var(--yellow-soft); }
+.badge.is-confirmed { color: var(--ok); border-color: #2f4a2d; background: rgba(111,174,106,0.1); }
+.badge.is-canceled { color: var(--gray-dim); text-decoration: line-through; }
+.badge.is-completed { color: var(--gray); }
+
+/* ---------- scrollbar ---------- */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+}
+
+@keyframes riseIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}

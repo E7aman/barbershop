@@ -1,0 +1,397 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Кабинет мастера — {{ master_name }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'barbers/css/theme.css' %}">
+<style>
+    .wrap { max-width: 900px; margin: 0 auto; padding: 0 20px 60px; }
+
+    .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 22px 0 22px; border-bottom: 1px solid var(--line); margin-bottom: 26px; }
+    .greeting { font-family: 'Bebas Neue', sans-serif; font-size: 1.7rem; letter-spacing: 0.02em; margin: -18px 0 26px; }
+    .greeting span { color: var(--yellow); }
+
+    .error-box { background: var(--charcoal); border: 1px solid var(--line); border-left: 3px solid var(--yellow); border-radius: var(--radius-sm); padding: 18px 20px; color: var(--gray); }
+
+    .section-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 0.03em; margin: 0 0 14px; display: flex; align-items: center; gap: 10px; }
+
+    /* calendar */
+    .cal-card { padding: 20px 22px 22px; margin-bottom: 26px; }
+    .cal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .cal-head h3 { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.03em; margin: 0; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; }
+    .wd { font-size: 0.72rem; font-weight: 700; color: var(--gray-dim); text-transform: uppercase; padding-bottom: 4px; }
+    .day {
+        padding: 11px 0; background: var(--charcoal-2); border: 1px solid transparent; border-radius: var(--radius-sm);
+        cursor: pointer; font-size: 0.9rem; font-family: 'JetBrains Mono', monospace; transition: all 0.12s ease;
+    }
+    .day:hover:not(.empty) { border-color: var(--gray-dim); }
+    .day.empty { background: transparent; cursor: default; }
+    .day.off { background: var(--charcoal); color: var(--gray-dim); border-color: var(--line); text-decoration: line-through; }
+    .day.picked { background: var(--yellow); color: var(--black); font-weight: 700; }
+    .cal-legend { display: flex; gap: 18px; margin-top: 16px; font-size: 0.8rem; color: var(--gray); flex-wrap: wrap; }
+    .cal-legend .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 6px; vertical-align: -1px; }
+    .dot.off-dot { background: var(--charcoal-2); border: 1px solid var(--line); }
+    .dot.picked-dot { background: var(--yellow); }
+    .cal-foot { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+    /* controls */
+    .controls { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; padding: 18px 20px; margin-bottom: 22px; }
+    .controls .field { margin-top: 0; }
+    .controls input[type=date] { color-scheme: dark; }
+
+    .day-status { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+
+    .appt-card {
+        display: flex; justify-content: space-between; align-items: center; gap: 14px;
+        padding: 16px 18px; border-radius: var(--radius-sm); background: var(--charcoal);
+        border: 1px solid var(--line); border-left: 3px solid var(--yellow-dim);
+        margin-bottom: 12px;
+    }
+    .appt-card .time { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--yellow); font-size: 1.05rem; }
+    .appt-card .service { font-weight: 600; margin-top: 2px; }
+    .appt-card .client { color: var(--gray); font-size: 0.85rem; margin-top: 3px; }
+
+    .empty-note { color: var(--gray); font-size: 0.9rem; background: var(--charcoal); border: 1px dashed var(--line); border-radius: var(--radius-sm); padding: 18px; text-align: center; }
+
+    /* weekly schedule */
+    .schedule-card { padding: 20px 22px 22px; margin-bottom: 26px; }
+    .schedule-row {
+        display: grid;
+        grid-template-columns: 34px 110px 1fr 1fr;
+        align-items: center;
+        gap: 14px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--line);
+    }
+    .schedule-row:last-of-type { border-bottom: none; }
+    .schedule-row .day-label { font-weight: 700; font-size: 0.92rem; }
+    .schedule-row.is-off .day-label { color: var(--gray-dim); }
+    .schedule-row input[type=checkbox] {
+        width: 18px; height: 18px; accent-color: var(--yellow); cursor: pointer;
+    }
+    .schedule-row input[type=time] {
+        width: 100%;
+        padding: 9px 10px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--line);
+        background: var(--charcoal-2);
+        color: var(--white);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        color-scheme: dark;
+    }
+    .schedule-row input[type=time]:disabled { opacity: 0.35; cursor: not-allowed; }
+    .schedule-foot { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+    .auth-links {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 30px;
+    }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+    <div class="top-bar">
+        <div class="brand-bar" style="padding:0;"><span class="mark"></span><span class="name">BARBER<b>BOOK</b></span></div>
+        {% if not error %}
+        <a href="{% url 'master_logout' %}" style="text-decoration:none;"><button class="btn btn-ghost">Выйти →</button></a>
+        {% endif %}
+    </div>
+
+    {% if error %}
+        <div class="error-box">
+            {{ error }}
+            <div class="auth-links">
+                <a href="/admin/" class="btn btn-outline">
+                    Админка
+                </a>
+            </div>
+        </div>
+    {% else %}
+        <p class="greeting">Привет, <span>{{ master_name }}</span> ✂️</p>
+
+        <input type="hidden" id="master-id" value="{{ master_id }}">
+
+        <div class="surface schedule-card">
+            <p class="section-title">Рабочие часы</p>
+            <div id="schedule-rows"></div>
+            <div class="schedule-foot">
+                <button class="btn btn-primary" onclick="saveWorkSchedule()">Сохранить график</button>
+            </div>
+        </div>
+
+        <div class="surface cal-card">
+            <div class="cal-head">
+                <button class="btn btn-outline" onclick="changeMonth(-1)">← Пред.</button>
+                <h3 id="calendar-month-year">Месяц Год</h3>
+                <button class="btn btn-outline" onclick="changeMonth(1)">След. →</button>
+            </div>
+            <div class="cal-grid" id="calendar-grid"></div>
+            <div class="cal-legend">
+                <span><span class="dot off-dot"></span>Выходной в базе</span>
+                <span><span class="dot picked-dot"></span>Выбрано сейчас / выходной</span>
+            </div>
+            <div class="cal-foot">
+                <button class="btn btn-primary" onclick="saveVacationDays()">Сохранить выходные</button>
+            </div>
+        </div>
+
+        <div class="surface controls">
+            <div class="field">
+                <label for="filter-date">Дата</label>
+                <input type="date" id="filter-date" onchange="loadMasterData()">
+            </div>
+            <button class="btn btn-outline" onclick="loadMasterData()">Обновить список</button>
+            <button class="btn btn-outline" onclick="toggleDayOff()">Заблокировать / открыть день</button>
+        </div>
+
+        <div class="day-status">
+            <p class="section-title" style="margin:0;">Записи на этот день</p>
+            <div id="day-status-container"></div>
+        </div>
+
+        <div id="appointments-container"></div>
+    {% endif %}
+</div>
+
+<script>
+    const mId = document.getElementById('master-id')?.value;
+    let currentYear = new Date().getFullYear();
+    let currentMonth = new Date().getMonth();
+    let selectedDates = new Set();
+    let dbOffDates = new Set();
+
+    if (mId) {
+        const today = new Date();
+        const offset = today.getTimezoneOffset();
+        const localToday = new Date(today.getTime() - (offset * 60 * 1000));
+        document.getElementById('filter-date').value = localToday.toISOString().split('T')[0];
+
+        window.onload = () => {
+            loadDbOffDays();
+            loadMasterData();
+            loadWorkSchedule();
+        };
+    }
+
+    const WEEKDAYS_FULL = [
+        { id: 1, label: 'Понедельник' }, { id: 2, label: 'Вторник' }, { id: 3, label: 'Среда' },
+        { id: 4, label: 'Четверг' }, { id: 5, label: 'Пятница' }, { id: 6, label: 'Суббота' }, { id: 7, label: 'Воскресенье' }
+    ];
+
+    function renderScheduleRows(schedule) {
+        const container = document.getElementById('schedule-rows');
+        container.innerHTML = '';
+        WEEKDAYS_FULL.forEach(({ id, label }) => {
+            const existing = schedule[String(id)];
+            const isWorking = !!existing;
+            const row = document.createElement('div');
+            row.className = 'schedule-row' + (isWorking ? '' : ' is-off');
+            row.dataset.day = id;
+            row.innerHTML = `
+                <input type="checkbox" class="day-check" ${isWorking ? 'checked' : ''}>
+                <span class="day-label">${label}</span>
+                <input type="time" class="day-start" value="${existing ? existing.start : '09:00'}" ${isWorking ? '' : 'disabled'}>
+                <input type="time" class="day-end" value="${existing ? existing.end : '18:00'}" ${isWorking ? '' : 'disabled'}>`;
+
+            const checkbox = row.querySelector('.day-check');
+            const startInput = row.querySelector('.day-start');
+            const endInput = row.querySelector('.day-end');
+            checkbox.onchange = () => {
+                const on = checkbox.checked;
+                row.classList.toggle('is-off', !on);
+                startInput.disabled = !on;
+                endInput.disabled = !on;
+            };
+            container.appendChild(row);
+        });
+    }
+
+    function loadWorkSchedule() {
+        fetch(`/api/masters/${mId}/work-schedule/`)
+            .then(res => res.json())
+            .then(data => renderScheduleRows(data.schedule || {}))
+            .catch(() => renderScheduleRows({}));
+    }
+
+    function saveWorkSchedule() {
+        const rows = document.querySelectorAll('#schedule-rows .schedule-row');
+        const days = Array.from(rows).map(row => {
+            const isWorking = row.querySelector('.day-check').checked;
+            return {
+                day_of_week: parseInt(row.dataset.day),
+                is_working: isWorking,
+                start_time: row.querySelector('.day-start').value,
+                end_time: row.querySelector('.day-end').value
+            };
+        });
+
+        fetch(`/api/masters/${mId}/work-schedule/update/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ days })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) { alert('Ошибка: ' + data.error); return; }
+            alert(data.message || 'График сохранён');
+            loadMasterData();
+        })
+        .catch(() => alert('Не удалось сохранить график.'));
+    }
+
+    function loadDbOffDays() {
+        fetch(`/api/masters/${mId}/off-days/`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.off_dates) dbOffDates = new Set(data.off_dates.map(d => d.trim()));
+                renderCalendar();
+                updateDayStatusBadge();
+            })
+            .catch(err => {
+                console.error('Ошибка загрузки выходных дней:', err);
+                renderCalendar();
+            });
+    }
+
+    const monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+    const dayNames = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+    function renderCalendar() {
+        const grid = document.getElementById('calendar-grid');
+        const title = document.getElementById('calendar-month-year');
+        if (!grid) return;
+        grid.innerHTML = '';
+        title.innerText = `${monthNames[currentMonth]} ${currentYear}`;
+
+        dayNames.forEach(d => {
+            const el = document.createElement('div');
+            el.className = 'wd';
+            el.innerText = d;
+            grid.appendChild(el);
+        });
+
+        const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
+        const startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+        const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+        for (let i = 0; i < startOffset; i++) {
+            const e = document.createElement('div');
+            e.className = 'day empty';
+            grid.appendChild(e);
+        }
+
+        for (let day = 1; day <= totalDays; day++) {
+            const cell = document.createElement('div');
+            cell.className = 'day';
+            cell.innerText = day;
+            const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+            if (dbOffDates.has(dateStr)) cell.classList.add('off');
+            if (selectedDates.has(dateStr)) cell.classList.add('picked');
+
+            cell.onclick = () => {
+                if (selectedDates.has(dateStr)) {
+                    selectedDates.delete(dateStr);
+                    cell.classList.remove('picked');
+                } else {
+                    selectedDates.add(dateStr);
+                    cell.classList.add('picked');
+                }
+            };
+            grid.appendChild(cell);
+        }
+    }
+
+    function changeMonth(direction) {
+        currentMonth += direction;
+        if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+        else if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+        renderCalendar();
+    }
+
+    function saveVacationDays() {
+        if (selectedDates.size === 0) { alert('Вы не выбрали ни одной новой даты!'); return; }
+        const datesArray = Array.from(selectedDates);
+        if (!confirm(`Изменить статус доступности для дат:\n${datesArray.join(', ')}?`)) return;
+
+        fetch('/api/masters/bulk-toggle-off-days/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ master_id: parseInt(mId), dates: datesArray })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) { alert('Ошибка: ' + data.error); return; }
+            alert(data.message || 'Выходные успешно изменены!');
+            selectedDates.clear();
+            loadDbOffDays();
+            loadMasterData();
+        })
+        .catch(err => { console.error(err); alert('Произошла ошибка при связи с сервером.'); });
+    }
+
+    function updateDayStatusBadge() {
+        const targetDate = document.getElementById('filter-date').value;
+        const c = document.getElementById('day-status-container');
+        if (!c) return;
+        c.innerHTML = dbOffDates.has(targetDate)
+            ? `<span class="badge is-canceled">Выходной</span>`
+            : `<span class="badge is-confirmed">Рабочий день</span>`;
+    }
+
+    function loadMasterData() {
+        const date = document.getElementById('filter-date').value;
+        const container = document.getElementById('appointments-container');
+        if (!container) return;
+        container.innerHTML = '<p class="empty-note">Загрузка расписания…</p>';
+        updateDayStatusBadge();
+
+        fetch(`/api/masters/${mId}/appointments/?date=${date}`)
+            .then(res => res.json())
+            .then(data => {
+                container.innerHTML = '';
+                if (!data.appointments || data.appointments.length === 0) {
+                    container.innerHTML = '<p class="empty-note">Записей нет. День свободен или выставлен как выходной.</p>';
+                    return;
+                }
+                const statusClass = { pending: 'is-pending', confirmed: 'is-confirmed', canceled: 'is-canceled', completed: 'is-completed' };
+                data.appointments.forEach(app => {
+                    const card = document.createElement('div');
+                    card.className = 'appt-card';
+                    card.innerHTML = `
+                        <div>
+                            <div class="time">${app.time}</div>
+                            <div class="service">${app.service_name} · ${app.service_duration} мин</div>
+                            <div class="client">${app.client_name || 'Без имени'} · ${app.client_phone || '—'}</div>
+                        </div>
+                        <span class="badge ${statusClass[app.status] || ''}">${app.status_display}</span>`;
+                    container.appendChild(card);
+                });
+            })
+            .catch(() => { container.innerHTML = '<p class="empty-note">Не удалось загрузить записи.</p>'; });
+    }
+
+    function toggleDayOff() {
+        const date = document.getElementById('filter-date').value;
+        if (!confirm(`Изменить статус доступности для даты ${date}?`)) return;
+
+        fetch('/api/masters/toggle-off-day/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ master_id: parseInt(mId), date: date })
+        })
+        .then(res => res.json())
+        .then(data => { alert(data.message); loadDbOffDays(); });
+    }
+</script>
+</body>
+</html>
