@@ -1,14 +1,17 @@
 from django.contrib import admin
-from unfold.admin import ModelAdmin as UnfoldModelAdmin  # <--- Главный класс для красоты и кнопок
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
+from unfold.contrib.auth.admin import UserAdmin as UnfoldUserAdmin  # type: ignore <--- Игнорим придирки Pylance
 from .models import User, Service, MasterProfile, WorkSchedule, MasterOffDay, Appointment
 
-# 1. Пользователи
 @admin.register(User)
-class CustomUserAdmin(UnfoldModelAdmin):
+class CustomUserAdmin(UnfoldUserAdmin):  # <--- Меняем обратно на UnfoldUserAdmin
     list_display = ('username', 'first_name', 'phone', 'role', 'is_staff')
     list_filter = ('role', 'is_staff')
-    fields = ('username', 'first_name', 'last_name', 'email', 'role', 'phone', 'tg_chat_id', 'is_staff', 'is_active', 'is_superuser')
-
+    
+    # Расширяем стандартные поля UnfoldUserAdmin, добавляя твои кастомные
+    fieldsets = UnfoldUserAdmin.fieldsets + (
+        ('Дополнительные поля ролей', {'fields': ('role', 'phone', 'tg_chat_id')}),
+    )
 # 2. Записи (Appointments) — теперь тоже на UnfoldModelAdmin
 @admin.register(Appointment)
 class AppointmentAdmin(UnfoldModelAdmin):
