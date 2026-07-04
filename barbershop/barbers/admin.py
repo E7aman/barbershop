@@ -1,16 +1,18 @@
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from unfold.admin import UserAdmin as UnfoldUserAdmin  # <--- Импортируем unfold-версию админки
 from .models import User, Service, MasterProfile, WorkSchedule, MasterOffDay, Appointment
 
-# Красиво выводим пользователей
+# Используем unfold'овский UserAdmin
 @admin.register(User)
-class CustomUserAdmin(UserAdmin):
+class CustomUserAdmin(UnfoldUserAdmin):
     list_display = ('username', 'first_name', 'phone', 'role', 'is_staff')
     list_filter = ('role', 'is_staff')
-    fieldsets = UserAdmin.fieldsets + (
+    
+    # Добавляем кастомные поля в филдсеты unfold
+    fieldsets = UnfoldUserAdmin.fieldsets + (
         ('Дополнительные поля ролей', {'fields': ('role', 'phone', 'tg_chat_id')}),
     )
-
 # Выводим записи (самое главное для админа)
 @admin.register(Appointment)
 class AppointmentAdmin(admin.ModelAdmin):
