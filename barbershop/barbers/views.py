@@ -71,6 +71,41 @@ def send_telegram_message(chat_id, text):
         print(f"[Telegram] Не удалось отправить сообщение: {e}")
         return False
 
+@csrf_exempt
+def telegram_webhook(request, secret):
+    """
+    Сюда Telegram присылает все сообщения, написанные боту (в т.ч. /start).
+    URL содержит секрет, чтобы никто посторонний не мог слать сюда поддельные апдейты.
+    """
+    if not settings.TELEGRAM_WEBHOOK_SECRET or secret != settings.TELEGRAM_WEBHOOK_SECRET:
+        return JsonResponse({'error': 'forbidden'}, status=403)
+    if request.method != 'POST':
+        return JsonResponse({'ok': True})
+
+    try:
+        update = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'ok': True})
+
+    message = update.get('message') or update.get('edited_message')
+    if not message or 'chat' not in message:
+        return JsonResponse({'ok': True})
+
+    chat_id = message['chat']['id']
+    text = (message.get('text') or '').strip()
+
+    if text.startswith('/start'):
+        reply = (
+            "Привет! 👋\n\n"
+            f"Ваш chat ID: {chat_id}\n\n"
+            "Скопируйте это число и вставьте в поле «Ваш Telegram chat ID» в личном кабинете на сайте — "
+            "после этого вы будете получать уведомления о новых записях сюда, в этот чат."
+        )
+    else:
+        reply = f"Ваш chat ID: {chat_id}\n\nВставьте его в личном кабинете на сайте, чтобы получать уведомления."
+
+    send_telegram_message(chat_id, reply)
+    return JsonResponse({'ok': True})
 
 def send_appointment_notifications(appointment):
     client_name = appointment.client.first_name

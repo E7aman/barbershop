@@ -118,3 +118,5 @@ UNFOLD = {
     "GLOBAL_SEARCH": True,
     "SITE_URL": "/master/",
 }
+
+TELEGRAM_WEBHOOK_SECRET = os.getenv('TELEGRAM_WEBHOOK_SECRET', '')

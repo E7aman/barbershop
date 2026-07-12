@@ -32,4 +32,5 @@ urlpatterns = [
     path('api/masters/<int:master_id>/appointments/', views.get_master_appointments, name='master_appointments'),
     path('api/appointments/<int:appointment_id>/status/', views.update_appointment_status, name='update_appointment_status'),
     path('api/masters/<int:master_id>/telegram-chat-id/', views.update_master_chat_id, name='update_master_chat_id'),
+    path('api/telegram/webhook/<str:secret>/', views.telegram_webhook, name='telegram_webhook'),
 ]
