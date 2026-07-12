@@ -94,6 +94,39 @@
         gap: 12px;
         margin-top: 30px;
     }
+
+    /* layout: главная колонка + сайдбар */
+    .layout { display: grid; grid-template-columns: 1fr 320px; gap: 26px; align-items: start; }
+    @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+    /* telegram card */
+    .tg-card { padding: 18px 20px; margin-bottom: 26px; }
+    .tg-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .tg-row input[type=text] {
+        flex: 1; min-width: 180px; padding: 9px 10px; border-radius: var(--radius-sm);
+        border: 1px solid var(--line); background: var(--charcoal-2); color: var(--white);
+        font-family: 'JetBrains Mono', monospace; font-size: 0.9rem;
+    }
+    .tg-hint { color: var(--gray); font-size: 0.82rem; margin-top: 10px; line-height: 1.5; }
+    .tg-status { font-size: 0.82rem; margin-top: 8px; }
+    .tg-status.linked { color: var(--yellow); }
+    .tg-status.unlinked { color: var(--gray-dim); }
+
+    /* appointment action buttons */
+    .appt-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .appt-actions button { padding: 7px 12px; font-size: 0.78rem; }
+
+    /* sidebar */
+    .side-col { position: sticky; top: 20px; }
+    .upcoming-card { padding: 18px 18px 20px; }
+    .upcoming-item {
+        padding: 12px 0; border-bottom: 1px solid var(--line);
+        display: flex; flex-direction: column; gap: 3px;
+    }
+    .upcoming-item:last-child { border-bottom: none; }
+    .upcoming-item .u-date { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--yellow); }
+    .upcoming-item .u-service { font-weight: 600; font-size: 0.9rem; }
+    .upcoming-item .u-client { color: var(--gray); font-size: 0.8rem; }
 </style>
 </head>
 <body>
@@ -119,6 +152,26 @@
         <p class="greeting">Привет, <span>{{ master_name }}</span> ✂️</p>
 
         <input type="hidden" id="master-id" value="{{ master_id }}">
+
+        <div class="layout">
+        <div class="main-col">
+
+        <div class="surface tg-card">
+            <p class="section-title">Уведомления в Telegram</p>
+            <div class="tg-row">
+                <input type="text" id="tg-chat-id" placeholder="Ваш Telegram chat ID" value="{{ tg_chat_id }}">
+                <button class="btn btn-primary" onclick="saveTelegramChatId()">Сохранить</button>
+                {% if bot_username %}
+                <a href="https://t.me/{{ bot_username }}" target="_blank" rel="noopener" style="text-decoration:none;">
+                    <button class="btn btn-outline" type="button">Открыть бота →</button>
+                </a>
+                {% endif %}
+            </div>
+            <p class="tg-status {% if tg_chat_id %}linked{% else %}unlinked{% endif %}" id="tg-status-text">
+                {% if tg_chat_id %}Уведомления подключены{% else %}Уведомления не подключены{% endif %}
+            </p>
+            <p class="tg-hint">Нажмите «Открыть бота», отправьте ему /start — он пришлёт ваш chat ID. Скопируйте его сюда и сохраните.</p>
+        </div>
 
         <div class="surface schedule-card">
             <p class="section-title">Рабочие часы</p>
@@ -159,6 +212,16 @@
         </div>
 
         <div id="appointments-container"></div>
+
+        </div>
+
+        <aside class="side-col">
+            <div class="surface upcoming-card">
+                <p class="section-title">Все предстоящие записи</p>
+                <div id="upcoming-container"><p class="empty-note">Загрузка…</p></div>
+            </div>
+        </aside>
+        </div>
     {% endif %}
 </div>
 
@@ -179,6 +242,7 @@
             loadDbOffDays();
             loadMasterData();
             loadWorkSchedule();
+            loadUpcomingAppointments();
         };
     }
 
@@ -367,17 +431,100 @@
                 data.appointments.forEach(app => {
                     const card = document.createElement('div');
                     card.className = 'appt-card';
+
+                    let actionsHtml = '';
+                    if (app.status === 'pending') {
+                        actionsHtml = `
+                            <div class="appt-actions">
+                                <button class="btn btn-primary" onclick="updateAppointmentStatus(${app.id}, 'confirmed')">Подтвердить</button>
+                                <button class="btn btn-outline" onclick="updateAppointmentStatus(${app.id}, 'canceled')">Отменить</button>
+                            </div>`;
+                    } else if (app.status === 'confirmed') {
+                        actionsHtml = `
+                            <div class="appt-actions">
+                                <button class="btn btn-outline" onclick="updateAppointmentStatus(${app.id}, 'canceled')">Отменить</button>
+                            </div>`;
+                    }
+
                     card.innerHTML = `
                         <div>
                             <div class="time">${app.time}</div>
                             <div class="service">${app.service_name} · ${app.service_duration} мин</div>
                             <div class="client">${app.client_name || 'Без имени'} · ${app.client_phone || '—'}</div>
                         </div>
-                        <span class="badge ${statusClass[app.status] || ''}">${app.status_display}</span>`;
+                        <span class="badge ${statusClass[app.status] || ''}">${app.status_display}</span>
+                        ${actionsHtml}`;
                     container.appendChild(card);
                 });
             })
             .catch(() => { container.innerHTML = '<p class="empty-note">Не удалось загрузить записи.</p>'; });
+    }
+
+    function updateAppointmentStatus(appointmentId, newStatus) {
+        const label = newStatus === 'confirmed' ? 'подтвердить' : 'отменить';
+        if (!confirm(`Точно ${label} эту запись?`)) return;
+
+        fetch(`/api/appointments/${appointmentId}/status/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) { alert('Ошибка: ' + data.error); return; }
+            loadMasterData();
+            loadUpcomingAppointments();
+        })
+        .catch(() => alert('Не удалось изменить статус записи.'));
+    }
+
+    function loadUpcomingAppointments() {
+        const container = document.getElementById('upcoming-container');
+        if (!container) return;
+
+        fetch(`/api/masters/${mId}/appointments/?upcoming=true`)
+            .then(res => res.json())
+            .then(data => {
+                container.innerHTML = '';
+                if (!data.appointments || data.appointments.length === 0) {
+                    container.innerHTML = '<p class="empty-note">Предстоящих записей нет.</p>';
+                    return;
+                }
+                data.appointments.forEach(app => {
+                    const item = document.createElement('div');
+                    item.className = 'upcoming-item';
+                    const [y, m, d] = app.date.split('-');
+                    item.innerHTML = `
+                        <div class="u-date">${d}.${m}.${y} · ${app.time}</div>
+                        <div class="u-service">${app.service_name}</div>
+                        <div class="u-client">${app.client_name || 'Без имени'} · ${app.status_display}</div>`;
+                    container.appendChild(item);
+                });
+            })
+            .catch(() => { container.innerHTML = '<p class="empty-note">Не удалось загрузить список.</p>'; });
+    }
+
+    function saveTelegramChatId() {
+        const chatId = document.getElementById('tg-chat-id').value.trim();
+        fetch(`/api/masters/${mId}/telegram-chat-id/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tg_chat_id: chatId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) { alert('Ошибка: ' + data.error); return; }
+            const statusEl = document.getElementById('tg-status-text');
+            if (chatId) {
+                statusEl.textContent = 'Уведомления подключены';
+                statusEl.className = 'tg-status linked';
+            } else {
+                statusEl.textContent = 'Уведомления не подключены';
+                statusEl.className = 'tg-status unlinked';
+            }
+            alert(data.message || 'Сохранено');
+        })
+        .catch(() => alert('Не удалось сохранить chat ID.'));
     }
 
     function toggleDayOff() {
@@ -390,7 +537,11 @@
             body: JSON.stringify({ master_id: parseInt(mId), date: date })
         })
         .then(res => res.json())
-        .then(data => { alert(data.message); loadDbOffDays(); });
+        .then(data => {
+            if (data.error) { alert('Ошибка: ' + data.error); return; }
+            alert(data.message);
+            loadDbOffDays();
+        });
     }
 </script>
 </body>

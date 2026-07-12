@@ -12,6 +12,9 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-7^u6de%rue)f2zyh+vvfqy)z#k
 # Включаем DEBUG только локально, на Render он будет False
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', '')
+
 ALLOWED_HOSTS = ['*']
 
 

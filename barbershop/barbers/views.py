@@ -10,6 +10,15 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import logout as django_logout
 from .models import MasterProfile
 
+import json
+import calendar as calendar_module
+import requests
+from datetime import datetime, timedelta, date
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+from .models import MasterProfile, Appointment, WorkSchedule, User, Service, MasterOffDay
+
 @login_required(login_url='/master/login/')
 def master_page(request):
     """
@@ -23,7 +32,12 @@ def master_page(request):
         # Если зашел админ или клиент без профиля мастера, отдаем ошибку или редирект
         return render(request, 'barbers/master.html', {'error': 'Вы зашли как администратор/пользователь, но у вас нет профиля мастера.'})
 
-    return render(request, 'barbers/master.html', {'master_id': master_profile.id, 'master_name': request.user.get_full_name() or request.user.username})
+    return render(request, 'barbers/master.html', {
+        'master_id': master_profile.id,
+        'master_name': request.user.get_full_name() or request.user.username,
+        'tg_chat_id': request.user.tg_chat_id or '',
+        'bot_username': settings.TELEGRAM_BOT_USERNAME,
+    })
 
 
 def master_logout(request):
@@ -38,11 +52,27 @@ def index_page(request):
 # ==========================================
 # 1. СЛУЖЕБНАЯ ФУНКЦИЯ ДЛЯ УВЕДОМЛЕНИЙ (Будущая логика)
 # ==========================================
+def send_telegram_message(chat_id, text):
+    """
+    Отправляет сообщение через Telegram Bot API на конкретный chat_id.
+    Ничего не делает, если токен бота или chat_id не заданы.
+    """
+    if not settings.TELEGRAM_BOT_TOKEN or not chat_id:
+        print(f"[Telegram] Пропуск отправки — не задан токен бота или chat_id. Текст: {text}")
+        return False
+
+    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
+    try:
+        resp = requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=5)
+        if not resp.ok:
+            print(f"[Telegram] Ошибка отправки ({resp.status_code}): {resp.text}")
+        return resp.ok
+    except requests.RequestException as e:
+        print(f"[Telegram] Не удалось отправить сообщение: {e}")
+        return False
+
+
 def send_appointment_notifications(appointment):
-    """
-    Сюда мы позже пропишем реальные запросы к API WhatsApp и Telegram.
-    Пока это просто заглушка, которая выведет текст в консоль сервера.
-    """
     client_name = appointment.client.first_name
     client_phone = appointment.client.phone
     master_name = appointment.master.user.get_full_name() or appointment.master.user.username
@@ -50,16 +80,18 @@ def send_appointment_notifications(appointment):
     date_str = appointment.date.strftime('%d.%m.%Y')
     time_str = appointment.time_slot.strftime('%H:%M')
 
-    # Текст для клиента (в WhatsApp)
     whatsapp_text = f"Привет, {client_name}! Вы записаны на услугу '{service_name}' к мастеру {master_name}. Ждем вас {date_str} в {time_str}."
-    
-    # Текст для мастера (в Telegram)
-    telegram_text = f"🔥 Новая запись!\nУслуга: {service_name}\nКлиент: {client_name} ({client_phone})\nДата: {date_str} в {time_str}"
+    print(f"[WhatsApp] Имитация отправки клиенту ({client_phone}): {whatsapp_text}")
 
-    print("\n--- [ОТПРАВКА УВЕДОМЛЕНИЙ] ---")
-    print(f"Имитация WhatsApp для КЛИЕНТА ({client_phone}): {whatsapp_text}")
-    print(f"Имитация Telegram для МАСТЕРА: {telegram_text}")
-    print("---------------------------------\n")
+    telegram_text = (
+        f"🔥 Новая запись!\n"
+        f"Услуга: {service_name}\n"
+        f"Клиент: {client_name} ({client_phone})\n"
+        f"Дата: {date_str} в {time_str}\n\n"
+        f"Подтвердить или отменить можно в личном кабинете."
+    )
+    master_chat_id = appointment.master.user.tg_chat_id
+    send_telegram_message(master_chat_id, telegram_text)
 
 
 # ==========================================
@@ -291,8 +323,17 @@ def get_master_appointments(request, master_id):
         except ValueError:
             return JsonResponse({'error': 'Неверный формат даты. Используйте YYYY-MM-DD'}, status=400)
 
-    # Сортируем по дате и времени, чтобы список шёл по порядку
+    # ?upcoming=true — для сайдбара: все предстоящие активные записи подряд
+    is_upcoming = request.GET.get('upcoming') == 'true'
+    if is_upcoming:
+        appointments = appointments.filter(
+            date__gte=datetime.today().date(),
+            status__in=['pending', 'confirmed']
+        )
+
     appointments = appointments.order_by('date', 'time_slot')
+    if is_upcoming:
+        appointments = appointments[:50]
 
     # Формируем красивый список для отправки на фронтенд
     appointments_list = []
@@ -312,9 +353,87 @@ def get_master_appointments(request, master_id):
     return JsonResponse({'master_id': master_id, 'appointments': appointments_list})
 
 
+@login_required(login_url='/master/login/')
+@csrf_exempt
+def update_appointment_status(request, appointment_id):
+    """
+    POST { "status": "confirmed" | "canceled" }
+    Мастер меняет статус только СВОИХ записей — проверка через сессию.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Метод не поддерживается. Используйте POST'}, status=405)
+
+    try:
+        master_profile = MasterProfile.objects.get(user=request.user)
+    except MasterProfile.DoesNotExist:
+        return JsonResponse({'error': 'У вас нет профиля мастера'}, status=403)
+
+    try:
+        appointment = Appointment.objects.get(id=appointment_id, master=master_profile)
+    except Appointment.DoesNotExist:
+        return JsonResponse({'error': 'Запись не найдена или принадлежит другому мастеру'}, status=404)
+
+    try:
+        data = json.loads(request.body)
+        new_status = data.get('status')
+        allowed_statuses = ('confirmed', 'canceled', 'completed')
+        if new_status not in allowed_statuses:
+            return JsonResponse({'error': f'Статус должен быть одним из: {", ".join(allowed_statuses)}'}, status=400)
+
+        appointment.status = new_status
+        appointment.save(update_fields=['status'])
+
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Статус записи изменён на «{appointment.get_status_display()}»',
+            'appointment_id': appointment.id,
+            'new_status': appointment.status,
+        })
+    except Exception as e:
+        return JsonResponse({'error': f'Ошибка: {str(e)}'}, status=500)
+
+
+@login_required(login_url='/master/login/')
+@csrf_exempt
+def update_master_chat_id(request, master_id):
+    """POST { "tg_chat_id": "123456789" } — мастер привязывает свой chat_id."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Метод не поддерживается. Используйте POST'}, status=405)
+
+    try:
+        master_profile = MasterProfile.objects.get(id=master_id, user=request.user)
+    except MasterProfile.DoesNotExist:
+        return JsonResponse({'error': 'Вы не можете изменить чужой профиль'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        chat_id = (data.get('tg_chat_id') or '').strip()
+
+        request.user.tg_chat_id = chat_id or None
+        request.user.save(update_fields=['tg_chat_id'])
+
+        return JsonResponse({'status': 'success', 'message': 'Telegram chat ID сохранён'})
+    except Exception as e:
+        return JsonResponse({'error': f'Ошибка: {str(e)}'}, status=500)
+
 # ==========================================
 # 5. ЛИЧНЫЙ КАБИНЕТ МАСТЕРА: УПРАВЛЕНИЕ ВЫХОДНЫМИ (БАТЧ/ПАКЕТНАЯ ОБРАБОТКА)
 # ==========================================
+def get_conflicting_appointments(master_id, target_date):
+    return Appointment.objects.filter(
+        master_id=master_id,
+        date=target_date,
+        status__in=['pending', 'confirmed']
+    ).select_related('client', 'service').order_by('time_slot')
+
+
+def format_conflict_message(conflicts):
+    lines = [
+        f"{a.time_slot.strftime('%H:%M')} — {a.client.first_name if a.client else 'клиент'} ({a.service.name})"
+        for a in conflicts
+    ]
+    return "На эту дату уже есть записи, сначала отмените или перенесите их: " + "; ".join(lines)
+
 @csrf_exempt
 def toggle_off_day(request):
     if request.method != 'POST':
@@ -334,6 +453,9 @@ def toggle_off_day(request):
             off_day_query.delete()
             return JsonResponse({'status': 'success', 'message': 'День снова сделан РАБОЧИМ'})
         else:
+            conflicts = get_conflicting_appointments(master_id, target_date)
+            if conflicts.exists():
+                return JsonResponse({'error': format_conflict_message(conflicts)}, status=400)
             MasterOffDay.objects.create(master_id=master_id, date=target_date)
             return JsonResponse({'status': 'success', 'message': 'День успешно заблокирован (ВЫХОДНОЙ)'})
     except Exception as e:
@@ -366,28 +488,35 @@ def bulk_toggle_off_days(request):
             return JsonResponse({'error': 'Мастер не найден'}, status=404)
 
         processed_dates = []
+        skipped_dates = []
         for date_str in dates_list:
             try:
                 target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
             except ValueError:
-                continue # Если прилетела битая дата, просто пропускаем её
+                continue
 
-            # Переключаем статус дня:
             off_day_query = MasterOffDay.objects.filter(master=master_profile, date=target_date)
 
             if off_day_query.exists():
-                # Если уже был заблокирован — удаляем выходной (делаем рабочим)
                 off_day_query.delete()
+                processed_dates.append(date_str)
             else:
-                # Если не был выходным — блокируем день полностью
+                conflicts = get_conflicting_appointments(master_id, target_date)
+                if conflicts.exists():
+                    skipped_dates.append(date_str)
+                    continue
                 MasterOffDay.objects.create(master=master_profile, date=target_date)
-            
-            processed_dates.append(date_str)
+                processed_dates.append(date_str)
+
+        message = f'Статус успешно изменен для {len(processed_dates)} дат.'
+        if skipped_dates:
+            message += f' Пропущены (есть активные записи): {", ".join(skipped_dates)}.'
 
         return JsonResponse({
-            'status': 'success', 
-            'message': f'Статус успешно изменен для {len(processed_dates)} дат.',
-            'processed_dates': processed_dates
+            'status': 'success',
+            'message': message,
+            'processed_dates': processed_dates,
+            'skipped_dates': skipped_dates
         })
 
     except Exception as e:
